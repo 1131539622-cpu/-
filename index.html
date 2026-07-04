@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>极氪全系精算师</title>
+    <style>
+        :root { --primary: #11324d; --accent: #1f6392; --bg: #f4f7fa; }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { background: var(--bg); font-family: -apple-system, system-ui, sans-serif; padding: 10px 15px 240px; color: #2c3e50; }
+        .container { max-width: 550px; margin: 0 auto; }
+        .card { background: #fff; border-radius: 24px; padding: 20px; margin-bottom: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.04); }
+        .card-title { font-weight: 700; font-size: 16px; margin-bottom: 15px; color: var(--primary); display: flex; align-items: center; gap: 8px; }
+        .clickable-title { cursor: pointer; user-select: none; }
+        .clickable-title:active { opacity: 0.7; }
+        label { display: block; font-size: 13px; color: #6c7a91; margin-bottom: 8px; font-weight: 600; }
+        select, input { width: 100%; padding: 14px; border: 1.5px solid #edf2f7; border-radius: 16px; font-size: 16px; background: #f8fafc; margin-bottom: 12px; outline: none; }
+        .sub-item { display: flex; justify-content: space-between; padding: 14px 18px; background: #fff; border: 1.5px solid #edf2f7; border-radius: 16px; margin-bottom: 10px; cursor: pointer; }
+        .sub-item.active { border-color: var(--accent); background: #f0f7ff; }
+        .sub-item.active .name { color: var(--accent); font-weight: 700; }
+        .sub-item .price { font-weight: 700; color: var(--accent); }
+        .opt-tag { display: inline-block; background: #e2e8f0; padding: 4px 10px; border-radius: 8px; margin: 2px; font-size: 12px; }
+        .invoice-highlight { background: #eef3fa; padding: 18px; border-radius: 20px; border: 1px solid #d9e6f5; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
+        .invoice-highlight .label { font-weight: 700; color: var(--primary); }
+        .invoice-highlight .value { font-size: 22px; font-weight: 800; color: var(--accent); }
+        .footer-banner { position: fixed; bottom: 0; left: 0; right: 0; background: var(--primary); color: white; padding: 20px 20px calc(20px + env(safe-area-inset-bottom)); border-radius: 30px 30px 0 0; z-index: 100; text-align: center; }
+        .total-price { font-size: 36px; font-weight: 800; margin-bottom: 15px; }
+        .btn-group { display: flex; gap: 12px; }
+        .btn { flex: 1; padding: 16px; border-radius: 18px; border: none; font-weight: 700; font-size: 16px; cursor: pointer; }
+        .finance-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+        .finance-grid .full-width { grid-column: span 2; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="card">
+        <div class="card-title">🚗 车型版本</div>
+        <label>车系</label>
+        <select id="modelSelect" onchange="onModelChange()"></select>
+        <label>配置</label>
+        <select id="versionSelect" onchange="onVersionChange()"></select>
+        <div style="display:flex; justify-content:space-between; font-weight:700; color:var(--primary); margin-top:10px;">
+            <span>指导价</span><span id="guideDisplay">¥0</span>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-title">🛠️ 选装项目 (可多选)</div>
+        <select id="optionMenu" multiple style="height: 200px;" onchange="onOptionChange()"></select>
+        <div id="optSummary" style="min-height: 20px; margin-top:10px;"></div>
+    </div>
+
+    <div class="card">
+        <div class="card-title clickable-title" onclick="handleTitleClick()">🎁 官方权益补贴</div>
+        <div id="subsidyList"></div>
+    </div>
+
+    <div class="invoice-highlight">
+        <span class="label">📄 开票价 (含选装)</span>
+        <span class="value" id="invoiceDisplay">¥ 0</span>
+    </div>
+
+    <div class="card">
+        <div class="card-title">🏦 金融方案</div>
+        <div style="margin-bottom:12px;">
+            <select id="financePlan" onchange="onFinancePlanChange()" style="font-weight:bold; color:var(--primary);">
+                <option value="2">2年0息 / 常规按揭 (2.99%)</option>
+                <option value="3" id="plan3yr">3年0息 (2.99% - 限特定车型)</option>
+            </select>
+        </div>
+        <div class="finance-grid">
+            <div>
+                <label>首付比例 (%)</label>
+                <input type="number" id="downPercent" value="20" step="0.1" oninput="calculate(0)">
+            </div>
+            <div>
+                <label>银行费率</label>
+                <input type="text" value="2.99%" disabled style="color: #a0aec0;">
+            </div>
+            <div>
+                <label>首付金额 (元)</label>
+                <input type="number" id="downAmtInput" oninput="calculate(1)">
+            </div>
+            <div>
+                <label>贷款本金 (元)</label>
+                <input type="number" id="loanAmtInput" oninput="calculate(2)">
+            </div>
+        </div>
+        
+        <div style="font-size:14px; background:#f8fafc; padding:15px; border-radius:18px;">
+            <div style="display:flex; justify-content:space-between; padding:5px 0;"><span>首付总额</span><b id="downAmt" style="color: var(--primary);">¥0</b></div>
+            <div style="display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px dashed #edf2f7; padding-bottom:5px; margin-bottom:5px;"><span>贷款金额</span><b id="loanAmtDisplay" style="color: var(--accent);">¥0</b></div>
+            <div style="display:flex; justify-content:space-between; padding:5px 0;"><span id="p1Label">1-24期 (仅本金)</span><b id="p1Amt">¥0</b></div>
+            <div style="display:flex; justify-content:space-between; padding:5px 0;"><span id="p2Label">25-60期 (2.99%费率)</span><b id="p2Amt">¥0</b></div>
+            <div style="display:flex; justify-content:space-between; padding:5px 0; border-top:1px solid #eee; margin-top:5px; padding-top:5px;"><span id="remLabel">两年后结清本金</span><b id="remAmt">¥0</b></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-title">📋 落地杂费</div>
+        <div style="display:flex; justify-content:space-between; margin-bottom:12px;"><span>购置税 (预估)</span><span id="taxDisplay">¥0</span></div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <span>预估保险</span>
+            <input type="number" id="insInput" style="width:120px; margin:0; text-align:right; font-weight:700; color:var(--accent);" oninput="manualIns=true; calculate(0)">
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span>上牌服务</span>
+            <select id="plateSelect" style="width:180px; margin:0; padding:8px 12px; border-radius:12px;" onchange="calculate(0)">
+                <option value="499">服务包 ¥499</option>
+                <option value="130">自行上牌 ¥130</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<div class="footer-banner">
+    <div style="font-size:13px; opacity:0.8; margin-bottom:5px;">合计落地价 (不含政府补贴)</div>
+    <div class="total-price" id="finalTotal">¥ 0</div>
+    <div class="btn-group">
+        <button class="btn" style="background:#fff; color:var(--primary);" onclick="copyQuote()">📋 复制报价</button>
+        <button class="btn" style="background:rgba(255,255,255,0.1); color:white;" onclick="resetCalculator()">清空重置</button>
+    </div>
+</div>
+
+<script>
+const DB = {
+    "极氪001": {
+        versions: [{n:"Max版",p:269800},{n:"ultra版",p:299800},{n:"ultra＋版",p:329800}],
+        subs: [
+            {n:"保险补贴",p:10000,a:1},
+            {n:"选装基金",p:10000,a:1,f:1,group:'A'},
+            {n:"配置补贴",p:8000,a:0,group:'A'},
+            {n:"金融补贴",p:2000,a:0}
+        ],
+        opts: [
+            ["撞色车顶",2000],["Brembo四活塞卡钳",5000],["智能感应自动门套装",7500],
+            ["伊姆斯躺椅",3000],["星空顶",15000],["电动拖车钩",7000],
+            ["碳纤维后视镜",8000],["碳纤维尾翼",14000]
+        ]
+    },
+    "极氪8x": {
+        versions: [{n:"Max版",p:356800},{n:"ultra版",p:376800},{n:"ultra＋版",p:426800},{n:"曜影版",p:500800}],
+        subs: [
+            {n:"超级置换金",p:15000,a:1},
+            {n:"保险补贴",p:10000,a:1},
+            {n:"选装基金",p:10000,a:1,f:1,group:'A'},
+            {n:"配置补贴",p:8000,a:0,group:'A'},
+            {n:"反选单屏",p:5000,r:1,ex:["Max版"]},
+            {n:"反选55kwh电池",p:15000,r:1,v:["ultra＋版"]},
+            {n:"反选H7智驾方案",p:25000,r:1,v:["曜影版"]}
+        ],
+        opts: [
+            ["70kwh电池",15000,["Max版","ultra版"]],
+            ["22英寸轮毂＋双阀ccd减振",10000,["Max版","ultra版"]],
+            ["六座悦享包",10000,null,["曜影版"]],
+            ["电动拖车钩",7000],
+            ["后排吸顶屏",10000,["Max版"]],
+            ["曜夜套装",20000,["Max版","ultra版"]],
+            ["千里浩瀚H9",25000,["Max版","ultra版","ultra＋版"]],
+            ["曜夜套装(U+)",10000,["ultra＋版"]],
+            ["哑光星际灰",10000,["曜影版"]],
+            ["22英寸凌波锻造熏黑轮毂",2000,["曜影版"]]
+        ]
+    },
+    "极氪9x": {
+        versions: [{n:"max版",p:465900},{n:"ultra版",p:485900},{n:"hyper版",p:559900},{n:"曜黑版",p:599900}],
+        subs: [
+            {n:"保险补贴",p:10000,a:1},
+            {n:"超级置换金",p:10000,a:1},
+            {n:"反选单屏",p:5000,r:1}
+        ],
+        opts: [
+            ["千里浩瀚H9",25000,["max版","ultra版"]],
+            ["曜黑外观套件",12000,null,["曜黑版"]],
+            ["高亮镀铬外观套件",12000,null,["曜黑版"]],
+            ["二排双旋转座椅",6000,["max版","ultra版"]],
+            ["电动拖车钩",7000,null,["曜黑版"]],
+            ["70kwh电池",15000,["ultra版"]],
+            ["曜黑套装",25000,null,["max版","曜黑版"]],
+            ["主动稳定杆",22000,["ultra版"]],
+            ["六活塞橙色卡钳",5000,["ultra版"]],
+            ["大饼轮毂",10000,["ultra版"]]
+        ]
+    },
+    "极氪7x": {
+        versions: [{n:"75度后驱Max",p:229800},{n:"103度后驱max",p:249800},{n:"103度四驱ultra",p:269800}],
+        subs: [
+            {n:"保险补贴",p:10000,a:1},
+            {n:"选装基金",p:7500,a:1,f:1,group:'A'},
+            {n:"配置补贴",p:6000,a:0,group:'A'},
+            {n:"金融补贴",p:2000,a:0}
+        ],
+        opts: [
+            ["熏黑外观",2000],["熏黑轮毂",2000],["星曜轮毂",2000],
+            ["四活塞卡钳",5000],["熏黑轮毂带四活塞卡钳",7000],
+            ["星曜轮毂带四活塞卡钳",7000],["21寸锻造轮毂带四活塞卡钳",9000],
+            ["nappa真皮",8000],["空气悬挂",7500,null,["103度四驱ultra"]],
+            ["电动门",7500],["灯幕",8000],["后排屏幕",3500]
+        ]
+    },
+    "极氪007GT": {
+        versions: [{n:"75度后驱Max",p:203900},{n:"103度后驱Max",p:223900},{n:"103度四驱ultra",p:243900}],
+        subs: [
+            {n:"保险补贴",p:8000,a:1},
+            {n:"选装基金",p:5000,a:1,f:1,group:'A'},
+            {n:"配置补贴",p:4000,a:0,group:'A'},
+            {n:"金融补贴",p:2000,a:0}
+        ],
+        opts: [
+            ["双电机四驱",20000,["75度后驱Max"]],
+            ["撞色车顶",2000],["熏黑下包围",1000],["FR-LINE套装",15000],
+            ["空悬",6000],["电动门",7500],["光感变色天幕",10000],["灯幕",8000],
+            ["熏黑轮毂",2000],["20寸锻造轮毂+四活塞",8000],
+            ["20寸雷霆锻造轮毂＋四活塞",9000],["20寸锻造轮毂＋四活塞＋空悬",14000],
+            ["20寸雷霆锻造轮毂＋四活塞＋空悬",15000],["Nappa真皮",8000],
+            ["电动拖车钩",7000]
+        ]
+    },
+    "极氪007": {
+        versions: [{n:"75度后驱Max",p:203900},{n:"103度后驱Max",p:223900},{n:"103度四驱ultra",p:243900}],
+        subs: [
+            {n:"保险补贴",p:8000,a:1},
+            {n:"选装基金",p:5000,a:1,f:1,group:'A'},
+            {n:"配置补贴",p:4000,a:0,group:'A'},
+            {n:"金融补贴",p:2000,a:0}
+        ],
+        opts: [
+            ["双电机四驱",20000,["75度后驱Max"]],
+            ["撞色车顶",2000],["熏黑下包围",1000],["FR-LINE套装",15000],
+            ["空悬",6000],["电动门",7500],["光感变色天幕",10000],["灯幕",8000],
+            ["熏黑轮毂",2000],["20寸锻造轮毂+四活塞",8000],
+            ["20寸雷霆锻造轮毂＋四活塞",9000],["20寸锻造轮毂＋四活塞＋空悬",14000],
+            ["20寸雷霆锻造轮毂＋四活塞＋空悬",15000],["Nappa真皮",8000],
+            ["电动拖车钩",7000]
+        ]
+    },
+    "极氪X": {
+        versions: [{n:"Max五座版",p:155800},{n:"Max四座版",p:159800},{n:"ultra五座版",p:175800}],
+        subs: [
+            {n:"保险补贴",p:7000,a:1},
+            {n:"选装基金",p:5000,a:1,f:1}
+        ],
+        opts: [
+            ["西雅图绿",8000],["电动门",5000],["调光天幕",10000],["冰箱",1999],
+            ["熏黑20寸轮毂＋四活塞卡钳",2000,["ultra五座版"]]
+        ]
+    },
+    "极氪009": {
+        versions: [{n:"七座ultra版",p:439800},{n:"七座ultra＋齐家版",p:459800},{n:"六座ultra＋行政版",p:469800}],
+        subs: [
+            {n:"保险补贴",p:10000,a:1},
+            {n:"超级置换金",p:10000,a:1},
+            {n:"选装基金",p:10000,a:1,f:1,group:'A'},
+            {n:"配置补贴",p:8000,a:0,group:'A'}
+        ],
+        opts: [
+            ["20英寸星耀轮毂",15000],["二排旋转座椅",6000,["七座ultra版"]]
+        ]
+    }
+};
+
+let manualIns = false;
+let clickCount = 0;
+let clickTimer = null;
+let showHiddenWelfare = false;
+
+const fmt = (num) => Math.round(num).toLocaleString('zh-CN');
+
+function init() {
+    const ms = document.getElementById('modelSelect');
+    ms.innerHTML = "";
+    Object.keys(DB).forEach(k => ms.add(new Option(k, k)));
+    onModelChange();
+}
+
+function handleTitleClick() {
+    clickCount++;
+    clearTimeout(clickTimer);
+    clickTimer = setTimeout(() => { clickCount = 0; }, 2000);
+
+    if (clickCount >= 5) {
+        showHiddenWelfare = true;
+        clickCount = 0;
+        alert("🎉 已成功解锁隐藏的「老车主增换购专属福利」政策！");
+        renderSubsidies();
+        calculate(0);
+    }
+}
+
+function onModelChange() {
+    showHiddenWelfare = false; 
+    const m = document.getElementById('modelSelect').value;
+    const vSelect = document.getElementById('versionSelect');
+    vSelect.innerHTML = "";
+    DB[m].versions.forEach(v => vSelect.add(new Option(v.n, v.n)));
+    
+    // 3年0息仅限特定车型
+    const eligible3Yr = ["极氪001", "极氪007", "极氪007GT", "极氪7x"].includes(m);
+    const planSelect = document.getElementById('financePlan');
+    document.getElementById('plan3yr').disabled = !eligible3Yr;
+    if (!eligible3Yr && planSelect.value === "3") {
+        planSelect.value = "2";
+    }
+
+    onVersionChange();
+}
+
+function onVersionChange() {
+    renderOptions();
+    renderSubsidies();
+    manualIns = false; 
+    calculate(0);
+}
+
+function onOptionChange() {
+    const m = document.getElementById('modelSelect').value;
+    if (m === "极氪007" || m === "极氪007GT") {
+        renderOptions(true); 
+    }
+    calculate(0);
+}
+
+function onFinancePlanChange() {
+    const pSel = document.getElementById('financePlan');
+    if (pSel.value === "3") {
+        let changed = false;
+        document.querySelectorAll('.sub-item.active').forEach(i => {
+            if (i.dataset.name.includes("金融补贴")) {
+                i.classList.remove('active');
+                changed = true;
+            }
+        });
+        if (changed) alert("⚠️ 选择3年0息方案时不可叠加享受「金融补贴2000」，已自动为您取消补贴。");
+    }
+    calculate(0);
+}
+
+function renderOptions(keepSelection = false) {
+    const m = document.getElementById('modelSelect').value;
+    const v = document.getElementById('versionSelect').value;
+    const data = DB[m];
+    const menu = document.getElementById('optionMenu');
+    
+    let selectedValues = [];
+    if (keepSelection) {
+        selectedValues = Array.from(menu.selectedOptions).map(o => o.value);
+    }
+
+    menu.innerHTML = "";
+    
+    const isDualMotorSelected = selectedValues.some(val => val.split('|')[0] === "双电机四驱");
+
+    data.opts.forEach(o => {
+        let matchV = (!o[2] || o[2].includes(v));
+        let matchEx = (!o[3] || !o[3].includes(v));
+        
+        if (o[3] === "dual_motor") {
+            matchEx = (v === "103度四驱ultra" || isDualMotorSelected);
+        }
+
+        if (matchV && matchEx) {
+            const optVal = `${o[0]}|${o[1]}`;
+            const op = new Option(`+ ${o[0]} (${fmt(o[1])})`, optVal);
+            if (selectedValues.includes(optVal)) op.selected = true;
+            menu.add(op);
+        }
+    });
+
+    const pile1 = `⚡ 7kW(10米)家充桩 (2,999)|pile_2999`;
+    const op1 = new Option(`⚡ 7kW(10米)家充桩 (2,999)`, pile1);
+    if (selectedValues.includes(pile1)) op1.selected = true;
+    menu.add(op1);
+
+    const pile2 = `⚡ 20kW家充桩 (13,800)|pile_13800`;
+    const op2 = new Option(`⚡ 20kW家充桩 (13,800)`, pile2);
+    if (selectedValues.includes(pile2)) op2.selected = true;
+    menu.add(op2);
+}
+
+function renderSubsidies() {
+    const m = document.getElementById('modelSelect').value;
+    const v = document.getElementById('versionSelect').value;
+    const data = DB[m];
+    const subList = document.getElementById('subsidyList');
+    
+    const activeSubNames = Array.from(document.querySelectorAll('.sub-item.active')).map(i => i.dataset.name);
+    subList.innerHTML = "";
+
+    let currentSubs = [...data.subs];
+
+    if (showHiddenWelfare) {
+        if (["极氪009", "极氪8x", "极氪001", "极氪9x"].includes(m)) {
+            currentSubs.push({ n: "千里浩瀚增购券抵扣", p: 20000, a: 0, isHidden: true });
+        } else if (m === "极氪7x") {
+            currentSubs.push({ n: "车主增换购券", p: 15000, a: 0, isHidden: true });
+        }
+    }
+
+    currentSubs.forEach(s => {
+        if ((!s.v || s.v.includes(v)) && (!s.ex || !s.ex.includes(v))) {
+            const div = document.createElement('div');
+            const isInitiallyActive = s.isHidden ? false : (activeSubNames.length > 0 ? activeSubNames.includes(s.n) : s.a);
+            
+            div.className = 'sub-item' + (isInitiallyActive ? ' active' : '');
+            if (s.isHidden) div.style.border = "1.5px dashed #e53e3e"; 
+            
+            div.dataset.name = s.n;
+            div.dataset.price = s.p;
+            div.dataset.isFund = s.f || 0;
+            div.dataset.isRev = s.r || 0;
+            if (s.group) div.dataset.group = s.group;
+            
+            div.innerHTML = `<span class="name">${s.isHidden ? '🔥 [隐藏福利] ' : ''}${s.r ? '[反向选装] ' : ''}${s.n}</span><span class="price">-${fmt(s.p)}</span>`;
+            
+            div.onclick = () => { 
+                div.classList.toggle('active'); 
+                
+                // 处理互斥逻辑 (例如：配置补贴与选装基金互斥)
+                if (div.classList.contains('active') && s.group) {
+                    document.querySelectorAll('.sub-item.active').forEach(other => {
+                        if (other !== div && other.dataset.group === s.group) {
+                            other.classList.remove('active');
+                        }
+                    });
+                }
+
+                // 处理3年0息排斥金融补贴逻辑
+                if (div.classList.contains('active') && s.n.includes("金融补贴")) {
+                    const pSel = document.getElementById('financePlan');
+                    if (pSel.value === "3") {
+                        alert("⚠️ 金融补贴与3年0息方案不可同时享受，已为您自动切换为常规/2年0息方案。");
+                        pSel.value = "2";
+                    }
+                }
+
+                calculate(0); 
+            };
+            subList.appendChild(div);
+        }
+    });
+}
+
+function matchInsurance(model, version) {
+    if (model === "极氪001") return 8000;
+    if (model === "极氪8x") return 9000;
+    if (model === "极氪9x") return 10000;
+    if (model === "极氪7x") return 7000;
+    if (model === "极氪007" || model === "极氪007GT") return 6500;
+    if (model === "极氪X") return 5000;
+    if (model === "极氪009") return 10000;
+    return 7000; 
+}
+
+function calculate(targetMode) {
+    const m = document.getElementById('modelSelect').value;
+    const v = document.getElementById('versionSelect').value;
+    const basePrice = DB[m].versions.find(i => i.n === v).p;
+    document.getElementById('guideDisplay').innerText = "¥" + fmt(basePrice);
+
+    let optSum = 0;
+    let pileSum = 0;
+    let selectedTags = [];
+    
+    for (let o of document.getElementById('optionMenu').selectedOptions) {
+        const [optName, optPriceStr] = o.value.split('|');
+        if (optPriceStr.startsWith("pile_")) {
+            pileSum += (optPriceStr === "pile_2999" ? 2999 : 13800);
+        } else {
+            optSum += parseInt(optPriceStr);
+        }
+        selectedTags.push(optName);
+    }
+    document.getElementById('optSummary').innerHTML = selectedTags.map(t => `<span class="opt-tag">${t}</span>`).join('');
+
+    let fund = 0; 
+    let subSum = 0; 
+    let revSum = 0;
+    document.querySelectorAll('.sub-item.active').forEach(i => {
+        if (i.dataset.isFund === '1') fund = parseInt(i.dataset.price);
+        else if (i.dataset.isRev === '1') revSum += parseInt(i.dataset.price);
+        else subSum += parseInt(i.dataset.price);
+    });
+
+    const usedFundForOpt = Math.min(optSum, fund);
+    const remFund = fund - usedFundForOpt; 
+    const usedFundForPile = Math.min(pileSum, remFund); 
+
+    const invoice = basePrice + (optSum - usedFundForOpt) - subSum - revSum;
+    document.getElementById('invoiceDisplay').innerText = "¥" + fmt(invoice);
+
+    const tax = Math.round(invoice / 11.3 > 30000 ? invoice / 11.3 - 15000 : (invoice / 11.3) / 2);
+    document.getElementById('taxDisplay').innerText = "¥" + fmt(Math.max(0, tax));
+
+    if (!manualIns) {
+        document.getElementById('insInput').value = matchInsurance(m, v);
+    }
+    const insurance = parseInt(document.getElementById('insInput').value) || 0;
+    const plateFee = parseInt(document.getElementById('plateSelect').value) || 499;
+
+    let dp = 0; let loan = 0; let pct = 0;
+    const financePlan = document.getElementById('financePlan').value;
+
+    if (targetMode === 0) {
+        pct = parseFloat(document.getElementById('downPercent').value) || 0;
+        if (financePlan === "3") {
+            if (pct < 20) { pct = 20; document.getElementById('downPercent').value = 20; }
+            if (pct > 80) { pct = 80; document.getElementById('downPercent').value = 80; }
+        }
+        dp = invoice * (pct / 100);
+        loan = invoice - dp;
+        document.getElementById('downAmtInput').value = Math.round(dp);
+        document.getElementById('loanAmtInput').value = Math.round(loan);
+    } else if (targetMode === 1) {
+        dp = parseFloat(document.getElementById('downAmtInput').value) || 0;
+        if (dp > invoice) dp = invoice;
+        loan = invoice - dp;
+        pct = invoice > 0 ? (dp / invoice) * 100 : 0;
+        document.getElementById('downPercent').value = pct.toFixed(1);
+        document.getElementById('loanAmtInput').value = Math.round(loan);
+    } else if (targetMode === 2) {
+        loan = parseFloat(document.getElementById('loanAmtInput').value) || 0;
+        if (loan > invoice) loan = invoice;
+        dp = invoice - loan;
+        pct = invoice > 0 ? (dp / invoice) * 100 : 0;
+        document.getElementById('downPercent').value = pct.toFixed(1);
+        document.getElementById('downAmtInput').value = Math.round(dp);
+    }
+
+    let p1 = loan / 60;
+    let rem = 0;
+    let p2 = 0;
+
+    const p1Label = document.getElementById('p1Label');
+    const p2Label = document.getElementById('p2Label');
+    const remLabel = document.getElementById('remLabel');
+
+    if (financePlan === "2") {
+        p1Label.innerText = "1-24期 (仅本金)";
+        p2Label.innerText = "25-60期 (2.99%费率)";
+        remLabel.innerText = "两年后结清本金";
+        
+        rem = loan - (p1 * 24);
+        p2 = (rem + (loan * 0.0299 * 3)) / 36;
+    } else {
+        p1Label.innerText = "1-36期 (仅本金)";
+        p2Label.innerText = "37-60期 (2.99%费率)";
+        remLabel.innerText = "三年后结清本金";
+        
+        rem = loan - (Math.round(p1) * 36); 
+        p2 = (rem + (loan * 0.0299 * 2)) / 24; 
+    }
+
+    document.getElementById('downAmt').innerText = "¥" + fmt(dp);
+    document.getElementById('loanAmtDisplay').innerText = "¥" + fmt(loan);
+    document.getElementById('p1Amt').innerText = "¥" + fmt(p1);
+    document.getElementById('p2Amt').innerText = "¥" + fmt(p2);
+    document.getElementById('remAmt').innerText = "¥" + fmt(rem);
+
+    const finalTotal = invoice + tax + insurance + plateFee + Math.max(0, pileSum - usedFundForPile);
+    document.getElementById('finalTotal').innerText = "¥ " + fmt(finalTotal);
+}
+
+function copyQuote() {
+    const m = document.getElementById('modelSelect').value;
+    const v = document.getElementById('versionSelect').value;
+    const base = DB[m].versions.find(i => i.n === v).p;
+    
+    let optText = "";
+    for (let o of document.getElementById('optionMenu').selectedOptions) {
+        const [optName, optPriceStr] = o.value.split('|');
+        const price = optPriceStr.startsWith("pile_") ? (optPriceStr === "pile_2999" ? 2999 : 13800) : parseInt(optPriceStr);
+        optText += `  +${optName} ${fmt(price)}\n`;
+    }
+    if (!optText) optText = "  无选装\n";
+
+    let subText = "";
+    document.querySelectorAll('.sub-item.active').forEach(i => {
+        subText += `  -${i.dataset.name} ${fmt(i.dataset.price)}\n`;
+    });
+    if (!subText) subText = "  无补贴\n";
+
+    const invoice = document.getElementById('invoiceDisplay').innerText.replace('¥','').replace(/,/g,'');
+    const tax = document.getElementById('taxDisplay').innerText.replace('¥','').replace(/,/g,'');
+    const ins = document.getElementById('insInput').value;
+    const plateVal = document.getElementById('plateSelect').value;
+    const plateText = plateVal === "499" ? "服务包 499" : "自行上牌 130";
+    const total = document.getElementById('finalTotal').innerText.replace('¥ ','').replace(/,/g,'');
+    const dpP = document.getElementById('downPercent').value;
+    const dpA = document.getElementById('downAmt').innerText.replace('¥','');
+    const loanA = document.getElementById('loanAmtDisplay').innerText.replace('¥','');
+    const p1 = document.getElementById('p1Amt').innerText.replace('¥','');
+    const p2 = document.getElementById('p2Amt').innerText.replace('¥','');
+    const rem = document.getElementById('remAmt').innerText.replace('¥','');
+
+    const plan = document.getElementById('financePlan').value;
+    let financeText = "";
+    if (plan === "2") {
+        financeText = `
+  1-24期 (仅本金)：¥${p1}/月
+  25-60期 (含息月供)：¥${p2}/月
+  两年后结清剩余本金：¥${rem} (即享受两年免息政策)`;
+    } else {
+        financeText = `
+  1-36期 (仅本金)：¥${p1}/月
+  37-60期 (含息月供)：¥${p2}/月
+  三年后结清剩余本金：¥${rem} (即享受三年免息政策)`;
+    }
+
+    const text = `${m} ${v} 报价单
+🔹 指导价 ${fmt(base)}
+  选装：
+${optText}  补贴抵扣：
+${subText}  = 开票价 ${fmt(invoice)}
+
+🔹其他费用
+  购置税 ${fmt(tax)}
+  预估保险 ${fmt(ins)}
+  上牌 ${plateText}
+
+🔹合计落地 (不含政府补贴)：
+  ${fmt(total)}
+
+🔹金融方案 (2.99%)
+  首付成数：${dpP}%
+  首付总额：¥${dpA}
+  贷款金额：¥${loanA}${financeText}`;
+
+    navigator.clipboard.writeText(text).then(() => alert("专业报价单已复制"));
+}
+
+function resetCalculator() {
+    manualIns = false;
+    showHiddenWelfare = false;
+    document.getElementById('financePlan').value = "2";
+    document.getElementById('plateSelect').value = "499";
+    document.getElementById('downPercent').value = "20";
+    init();
+}
+
+window.onload = init;
+</script>
+</body>
+</html>
